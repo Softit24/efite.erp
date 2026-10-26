@@ -33,7 +33,9 @@ app.register_blueprint(inventory_page)
 from sales_page import sales_page
 app.register_blueprint(sales_page)
 from reports_page import reports_page
+from pdf_reports import pdf_reports
 app.register_blueprint(reports_page)
+app.register_blueprint(pdf_reports)
 app.register_blueprint(customers_page)
 from crm_page import crm_page, init_crm_db
 app.register_blueprint(crm_page)

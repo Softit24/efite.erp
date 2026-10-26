@@ -19,3 +19,12 @@ app_dashboard_backup.py
 *_backup.py
 *_before_*.py
 products_page_before_*.py
+
+# Local databases, archives, generated reports, and backups
+efite.db.*
+*.zip
+efite_business_report.pdf
+reports_code.txt
+app.py.crm-backup
+
+efite.db.*

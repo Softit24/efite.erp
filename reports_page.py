@@ -28,6 +28,7 @@ header a{color:white}
 </style>
 </head>
 <body>
+<p><a href="/module/reports/download-pdf" style="display:inline-block;padding:10px 16px;background:#17365d;color:white;text-decoration:none;border-radius:5px;">Download PDF</a> <button onclick="window.print()" style="padding:10px 16px;cursor:pointer;">Print Report</button></p>
 <header>
 <h2>EFITE Business ERP</h2>
 <p>Reports & Business Dashboard</p>
