@@ -71,30 +71,30 @@ TEMPLATE = """
 </section>
 
 <section class="panel">
-<h3>Record Income</h3>
-<form method="post" action="{{ url_for('income_page.add_income') }}">
+<h3>{{ "Edit Income" if editing else "Record Income" }}</h3>
+<form method="post" action="{{ url_for('income_page.update_income', income_id=editing[0]) if editing else url_for('income_page.add_income') }}">
 <label>Description</label>
-<input name="description" maxlength="200" required
+<input name="description" maxlength="200" value="{{ editing[1] if editing else "" }}" required
        placeholder="e.g. Product sale or service payment">
 
 <label>Amount</label>
-<input type="number" name="amount" min="0.01" step="0.01"
+<input type="number" name="amount" min="0.01" step="0.01" value="{{ editing[2] if editing else "" }}"
        required placeholder="0.00">
 
 <label>Income date</label>
-<input type="date" name="income_date" required
+<input type="date" name="income_date" value="{{ editing[3] if editing else today }}" required
        value="{{ today }}">
 
 <label>Payment method</label>
 <select name="payment_method" required>
-<option>Cash</option>
-<option>Bank Transfer</option>
-<option>Mobile Banking</option>
-<option>Card</option>
-<option>Other</option>
+<option {{ "selected" if editing and editing[4] == "Cash" else "" }}>Cash</option>
+<option {{ "selected" if editing and editing[4] == "Bank Transfer" else "" }}>Bank Transfer</option>
+<option {{ "selected" if editing and editing[4] == "Mobile Banking" else "" }}>Mobile Banking</option>
+<option {{ "selected" if editing and editing[4] == "Card" else "" }}>Card</option>
+<option {{ "selected" if editing and editing[4] == "Other" else "" }}>Other</option>
 </select>
 
-<button type="submit">Save Income</button>
+<button type="submit">{{ "Update Income" if editing else "Save Income" }}</button>{% if editing %} <a href="{{ url_for('income_page.income') }}">Cancel</a>{% endif %}
 </form>
 </section>
 
@@ -104,7 +104,7 @@ TEMPLATE = """
 <div style="overflow-x:auto">
 <table>
 <thead>
-<tr><th>Date</th><th>Description</th><th>Method</th><th>Amount</th></tr>
+<tr><th>Date</th><th>Description</th><th>Method</th><th>Amount</th><th>Actions</th></tr>
 </thead>
 <tbody>
 {% for record in records %}
@@ -112,7 +112,7 @@ TEMPLATE = """
 <td>{{ record[3] }}</td>
 <td>{{ record[1] }}</td>
 <td>{{ record[4] }}</td>
-<td>{{ "%.2f"|format(record[2]) }}</td>
+<td>{{ "%.2f"|format(record[2]) }}</td><td><a href="{{ url_for('income_page.income', edit=record[0]) }}">Edit</a> <form method="post" action="{{ url_for('income_page.delete_income', income_id=record[0]) }}" onsubmit="return confirm(&quot;Delete this income record?&quot;)" style="display:inline"><button type="submit">Delete</button></form></td>
 </tr>
 {% endfor %}
 </tbody>
@@ -131,6 +131,8 @@ TEMPLATE = """
 @income_page.get("/module/income")
 def income():
     from datetime import date
+    edit_id = request.args.get("edit", type=int)
+    editing = None
 
     with sqlite3.connect(DB_PATH) as con:
         records = con.execute("""
@@ -141,9 +143,11 @@ def income():
         total = con.execute(
             "SELECT COALESCE(SUM(amount), 0) FROM income"
         ).fetchone()[0]
+        if edit_id:
+            editing = con.execute("SELECT id, description, amount, income_date, payment_method FROM income WHERE id = ?", (edit_id,)).fetchone()
 
     return render_template_string(
-        TEMPLATE, style=STYLE, records=records,
+        TEMPLATE, style=STYLE, records=records, editing=editing,
         total=total, today=date.today().isoformat()
     )
 
@@ -179,4 +183,38 @@ def add_income():
         """, (description, amount, income_date, payment_method))
 
     flash("Income recorded successfully.")
+    return redirect(url_for("income_page.income"))
+
+
+@income_page.post("/module/income/<int:income_id>/delete")
+def delete_income(income_id):
+    with sqlite3.connect(DB_PATH) as con:
+        cur = con.execute("DELETE FROM income WHERE id = ?", (income_id,))
+    flash("Income deleted successfully." if cur.rowcount else "Income record not found.")
+    return redirect(url_for("income_page.income"))
+
+
+@income_page.post("/module/income/<int:income_id>/update")
+def update_income(income_id):
+    description = request.form.get("description", "").strip()
+    amount_text = request.form.get("amount", "").strip()
+    income_date = request.form.get("income_date", "").strip()
+    payment_method = request.form.get("payment_method", "").strip()
+    try:
+        amount = float(amount_text)
+        if not description or len(description) > 200 or amount <= 0:
+            raise ValueError
+        from datetime import date
+        date.fromisoformat(income_date)
+        if payment_method not in ("Cash", "Bank Transfer", "Mobile Banking", "Card", "Other"):
+            raise ValueError
+    except (ValueError, TypeError):
+        flash("Please enter valid income details and a positive amount.")
+        return redirect(url_for("income_page.income", edit=income_id))
+    with sqlite3.connect(DB_PATH) as con:
+        cur = con.execute(
+            "UPDATE income SET description=?, amount=?, income_date=?, payment_method=? WHERE id=?",
+            (description, amount, income_date, payment_method, income_id)
+        )
+    flash("Income updated successfully." if cur.rowcount else "Income record not found.")
     return redirect(url_for("income_page.income"))
